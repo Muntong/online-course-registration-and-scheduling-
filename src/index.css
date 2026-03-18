@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paypal-dark: #003087;
+  --color-paypal-light: #0079C1;
+  --color-paypal-accent: #012169;
+  --color-paypal-bg: #f5f7fa;
+  --color-paypal-text: #2c2e2f;
+}
+
+body {
+  background-color: var(--color-paypal-bg);
+  color: var(--color-paypal-text);
+  font-family: 'Inter', system-ui, sans-serif;
+}
