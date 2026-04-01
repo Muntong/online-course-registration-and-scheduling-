@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { motion } from 'motion/react';
-import { BookOpen, Users, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { BookOpen, Users, Plus, Trash2, CheckCircle, Edit } from 'lucide-react';
 
 export const Courses = () => {
   const { user, token } = useAuthStore();
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
   const [newCourse, setNewCourse] = useState({ title: '', code: '', description: '', credits: 3, maxCapacity: 30, lecturer: '' });
   const [lecturers, setLecturers] = useState<any[]>([]);
   const [showStudentsModal, setShowStudentsModal] = useState(false);
@@ -53,8 +54,11 @@ export const Courses = () => {
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/courses', {
-        method: 'POST',
+      const url = editingCourseId ? `/api/courses/${editingCourseId}` : '/api/courses';
+      const method = editingCourseId ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -63,11 +67,26 @@ export const Courses = () => {
       });
       if (res.ok) {
         setShowModal(false);
+        setEditingCourseId(null);
+        setNewCourse({ title: '', code: '', description: '', credits: 3, maxCapacity: 30, lecturer: '' });
         fetchCourses();
       }
     } catch (error) {
-      console.error('Error creating course:', error);
+      console.error('Error saving course:', error);
     }
+  };
+
+  const handleEditCourse = (course: any) => {
+    setNewCourse({
+      title: course.title,
+      code: course.code,
+      description: course.description,
+      credits: course.credits,
+      maxCapacity: course.maxCapacity,
+      lecturer: course.lecturer?._id || ''
+    });
+    setEditingCourseId(course._id);
+    setShowModal(true);
   };
 
   const handleEnroll = async (courseId: string) => {
@@ -139,7 +158,11 @@ export const Courses = () => {
         </div>
         {user?.role === 'admin' && (
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              setEditingCourseId(null);
+              setNewCourse({ title: '', code: '', description: '', credits: 3, maxCapacity: 30, lecturer: '' });
+              setShowModal(true);
+            }}
             className="flex items-center space-x-2 bg-paypal-light hover:bg-paypal-dark text-white px-6 py-3 rounded-xl transition-colors shadow-md"
           >
             <Plus className="w-5 h-5" />
@@ -169,12 +192,20 @@ export const Courses = () => {
                     {course.code}
                   </span>
                   {user?.role === 'admin' && (
-                    <button 
-                      onClick={() => handleDeleteCourse(course._id)}
-                      className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex space-x-1">
+                      <button 
+                        onClick={() => handleEditCourse(course)}
+                        className="text-blue-400 hover:text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteCourse(course._id)}
+                        className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -239,7 +270,9 @@ export const Courses = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
           >
-            <h2 className="text-2xl font-bold text-paypal-dark mb-6">Create New Course</h2>
+            <h2 className="text-2xl font-bold text-paypal-dark mb-6">
+              {editingCourseId ? 'Edit Course' : 'Create New Course'}
+            </h2>
             <form onSubmit={handleCreateCourse} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Course Title</label>
@@ -308,7 +341,10 @@ export const Courses = () => {
               <div className="flex space-x-4 mt-8">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingCourseId(null);
+                  }}
                   className="flex-1 px-4 py-3 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 font-semibold transition-colors"
                 >
                   Cancel
@@ -317,7 +353,7 @@ export const Courses = () => {
                   type="submit"
                   className="flex-1 px-4 py-3 bg-paypal-light hover:bg-paypal-dark text-white rounded-xl font-semibold transition-colors shadow-md"
                 >
-                  Create
+                  {editingCourseId ? 'Update' : 'Create'}
                 </button>
               </div>
             </form>

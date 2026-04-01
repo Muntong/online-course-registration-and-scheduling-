@@ -1,5 +1,8 @@
 import express from 'express';
 import { Schedule } from '../models/Schedule.js';
+import { Course } from '../models/Course.js';
+import { User } from '../models/User.js';
+import { Notification } from '../models/Notification.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -20,6 +23,35 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
     const { course, lecturer, dayOfWeek, startTime, endTime, room } = req.body;
     const schedule = new Schedule({ course, lecturer, dayOfWeek, startTime, endTime, room });
     await schedule.save();
+
+    // Notify students and lecturer
+    const courseData = await Course.findById(course);
+    if (courseData) {
+      const notifications = [];
+      
+      // Notify enrolled students
+      for (const studentId of courseData.studentsEnrolled) {
+        notifications.push({
+          recipient: studentId,
+          message: `A new schedule has been added for ${courseData.title}: ${dayOfWeek} ${startTime}-${endTime} in ${room}`,
+          type: 'schedule'
+        });
+      }
+
+      // Notify lecturer
+      if (lecturer) {
+        notifications.push({
+          recipient: lecturer,
+          message: `You have been assigned a new schedule for ${courseData.title}: ${dayOfWeek} ${startTime}-${endTime} in ${room}`,
+          type: 'schedule'
+        });
+      }
+
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+      }
+    }
+
     res.status(201).json(schedule);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

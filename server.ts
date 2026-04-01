@@ -11,6 +11,7 @@ import courseRoutes from './server/routes/courses.js';
 import scheduleRoutes from './server/routes/schedules.js';
 import userRoutes from './server/routes/users.js';
 import departmentRoutes from './server/routes/departments.js';
+import notificationRoutes from './server/routes/notifications.js';
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ async function startServer() {
   app.use('/api/schedules', scheduleRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/departments', departmentRoutes);
+  app.use('/api/notifications', notificationRoutes);
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', dbConnected: mongoose.connection.readyState === 1 });

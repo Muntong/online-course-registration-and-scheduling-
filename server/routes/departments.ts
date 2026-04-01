@@ -31,6 +31,27 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
   }
 });
 
+// Update department (Admin only)
+router.put('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequest, res) => {
+  try {
+    const { name, code, faculty, headOfDepartment } = req.body;
+    
+    const existing = await Department.findOne({ code, _id: { $ne: req.params.id } });
+    if (existing) return res.status(400).json({ message: 'Department code already exists' });
+
+    const department = await Department.findByIdAndUpdate(
+      req.params.id,
+      { name, code, faculty, headOfDepartment },
+      { new: true }
+    ).populate('headOfDepartment', 'name email');
+    
+    if (!department) return res.status(404).json({ message: 'Department not found' });
+    res.json(department);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Delete department (Admin only)
 router.delete('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequest, res) => {
   try {

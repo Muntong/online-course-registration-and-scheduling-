@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { BookOpen, Calendar, Users, LogOut, LayoutDashboard, FileEdit, School, Clock, BarChart3, Key, BarChart2 } from 'lucide-react';
+import { Notifications } from './Notifications';
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, logout } = useAuthStore();
@@ -74,8 +75,21 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-8 max-w-7xl mx-auto">
+      <main className="flex-1 overflow-auto flex flex-col">
+        {/* Header */}
+        <header className="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center sticky top-0 z-30">
+          <h2 className="text-xl font-bold text-gray-800">
+            {navItems.find(item => item.path === location.pathname)?.label || 'EduSync'}
+          </h2>
+          <div className="flex items-center space-x-4">
+            <Notifications />
+            <div className="w-10 h-10 rounded-full bg-paypal-light/10 flex items-center justify-center text-paypal-dark font-bold border border-paypal-light/20">
+              {user?.name?.charAt(0).toUpperCase()}
+            </div>
+          </div>
+        </header>
+
+        <div className="p-8 max-w-7xl mx-auto w-full">
           {children}
         </div>
       </main>

@@ -1,6 +1,7 @@
 import express from 'express';
 import { Course } from '../models/Course.js';
 import { User } from '../models/User.js';
+import { Notification } from '../models/Notification.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -21,6 +22,18 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
     const { title, code, description, credits, lecturer, maxCapacity } = req.body;
     const course = new Course({ title, code, description, credits, lecturer, maxCapacity });
     await course.save();
+
+    // Notify all students
+    const students = await User.find({ role: 'student' });
+    const notifications = students.map(student => ({
+      recipient: student._id,
+      message: `A new course has been added: ${title} (${code})`,
+      type: 'course'
+    }));
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
+
     res.status(201).json(course);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -50,6 +63,26 @@ router.post('/:id/enroll', [authenticate, authorize(['student'])], async (req: A
       await user.save();
     }
 
+    // Notify admin and lecturer
+    const admins = await User.find({ role: 'admin' });
+    const notifications = admins.map(admin => ({
+      recipient: admin._id,
+      message: `Student ${user?.name} enrolled in course ${course.title} (${course.code})`,
+      type: 'enrollment'
+    }));
+    
+    if (course.lecturer) {
+      notifications.push({
+        recipient: course.lecturer as any,
+        message: `Student ${user?.name} enrolled in your course ${course.title} (${course.code})`,
+        type: 'enrollment'
+      });
+    }
+
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
+    }
+
     res.json({ message: 'Enrolled successfully', course });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -69,6 +102,26 @@ router.post('/:id/drop', [authenticate, authorize(['student'])], async (req: Aut
     if (user) {
       user.enrolledCourses = user.enrolledCourses.filter(id => id.toString() !== course._id.toString());
       await user.save();
+    }
+
+    // Notify admin and lecturer
+    const admins = await User.find({ role: 'admin' });
+    const notifications = admins.map(admin => ({
+      recipient: admin._id,
+      message: `Student ${user?.name} dropped course ${course.title} (${course.code})`,
+      type: 'enrollment'
+    }));
+    
+    if (course.lecturer) {
+      notifications.push({
+        recipient: course.lecturer as any,
+        message: `Student ${user?.name} dropped your course ${course.title} (${course.code})`,
+        type: 'enrollment'
+      });
+    }
+
+    if (notifications.length > 0) {
+      await Notification.insertMany(notifications);
     }
 
     res.json({ message: 'Dropped successfully', course });
@@ -120,6 +173,22 @@ router.post('/:id/admin-drop', [authenticate, authorize(['admin'])], async (req:
     }
 
     res.json({ message: 'Dropped successfully', course });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Update a course (Admin only)
+router.put('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequest, res) => {
+  try {
+    const { title, code, description, credits, lecturer, maxCapacity } = req.body;
+    const course = await Course.findByIdAndUpdate(
+      req.params.id,
+      { title, code, description, credits, lecturer, maxCapacity },
+      { new: true }
+    );
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+    res.json(course);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }

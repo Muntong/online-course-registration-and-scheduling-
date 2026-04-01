@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
+import { Notification } from '../models/Notification.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -27,6 +28,19 @@ router.post('/register', async (req, res) => {
     });
 
     await user.save();
+
+    // Notify admin if a student registers
+    if (assignedRole === 'student') {
+      const admins = await User.find({ role: 'admin' });
+      const notifications = admins.map(admin => ({
+        recipient: admin._id,
+        message: `A new student has registered: ${user.name} (${user.email})`,
+        type: 'registration'
+      }));
+      if (notifications.length > 0) {
+        await Notification.insertMany(notifications);
+      }
+    }
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'supersecretjwtkey', { expiresIn: '1h' });
     res.header('Authorization', token).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });

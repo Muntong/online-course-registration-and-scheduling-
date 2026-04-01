@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { motion } from 'motion/react';
-import { School, Plus, Trash2 } from 'lucide-react';
+import { School, Plus, Trash2, Edit } from 'lucide-react';
 
 export const Faculties = () => {
   const { token } = useAuthStore();
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingDeptId, setEditingDeptId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: '', code: '', faculty: '' });
 
   useEffect(() => {
@@ -32,8 +33,11 @@ export const Faculties = () => {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('/api/departments', {
-        method: 'POST',
+      const url = editingDeptId ? `/api/departments/${editingDeptId}` : '/api/departments';
+      const method = editingDeptId ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -43,11 +47,22 @@ export const Faculties = () => {
       if (res.ok) {
         setFormData({ name: '', code: '', faculty: '' });
         setShowAdd(false);
+        setEditingDeptId(null);
         fetchDepartments();
       }
     } catch (error) {
-      console.error('Error adding department:', error);
+      console.error('Error saving department:', error);
     }
+  };
+
+  const handleEdit = (dept: any) => {
+    setFormData({
+      name: dept.name,
+      code: dept.code,
+      faculty: dept.faculty
+    });
+    setEditingDeptId(dept._id);
+    setShowAdd(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -74,7 +89,11 @@ export const Faculties = () => {
           <p className="text-gray-500 mt-2">Manage academic faculties and departments.</p>
         </div>
         <button
-          onClick={() => setShowAdd(!showAdd)}
+          onClick={() => {
+            setEditingDeptId(null);
+            setFormData({ name: '', code: '', faculty: '' });
+            setShowAdd(!showAdd);
+          }}
           className="bg-paypal-light hover:bg-paypal-dark text-white px-4 py-2 rounded-xl flex items-center space-x-2 transition-colors"
         >
           <Plus className="w-5 h-5" />
@@ -84,7 +103,7 @@ export const Faculties = () => {
 
       {showAdd && (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-8">
-          <h2 className="text-xl font-bold mb-4">Add New Department</h2>
+          <h2 className="text-xl font-bold mb-4">{editingDeptId ? 'Edit Department' : 'Add New Department'}</h2>
           <form onSubmit={handleAdd} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <input
@@ -115,7 +134,10 @@ export const Faculties = () => {
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setShowAdd(false)}
+                onClick={() => {
+                  setShowAdd(false);
+                  setEditingDeptId(null);
+                }}
                 className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
               >
                 Cancel
@@ -124,7 +146,7 @@ export const Faculties = () => {
                 type="submit"
                 className="px-4 py-2 bg-paypal-light text-white rounded-xl hover:bg-paypal-dark transition-colors"
               >
-                Save
+                {editingDeptId ? 'Update' : 'Save'}
               </button>
             </div>
           </form>
@@ -138,9 +160,14 @@ export const Faculties = () => {
               <div className="p-3 bg-paypal-light/10 rounded-xl text-paypal-light">
                 <School className="w-6 h-6" />
               </div>
-              <button onClick={() => handleDelete(dept._id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex space-x-1">
+                <button onClick={() => handleEdit(dept)} className="text-blue-500 hover:bg-blue-50 p-2 rounded-full transition-colors">
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleDelete(dept._id)} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             
             <h3 className="text-xl font-bold text-gray-900 mb-1">{dept.name}</h3>
