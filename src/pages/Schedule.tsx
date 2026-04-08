@@ -19,6 +19,8 @@ export const Schedule = () => {
     room: ''
   });
 
+  const [error, setError] = useState('');
+
   useEffect(() => {
     fetchSchedules();
     if (user?.role === 'admin') {
@@ -59,6 +61,7 @@ export const Schedule = () => {
 
   const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     try {
       const res = await fetch('/api/schedules', {
         method: 'POST',
@@ -71,9 +74,13 @@ export const Schedule = () => {
       if (res.ok) {
         setShowModal(false);
         fetchSchedules();
+      } else {
+        const data = await res.json();
+        setError(data.message || 'Failed to create schedule');
       }
     } catch (error) {
       console.error('Error creating schedule:', error);
+      setError('An unexpected error occurred');
     }
   };
 
@@ -104,7 +111,10 @@ export const Schedule = () => {
         </div>
         {user?.role === 'admin' && (
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              setError('');
+              setShowModal(true);
+            }}
             className="flex items-center space-x-2 bg-paypal-light hover:bg-paypal-dark text-white px-6 py-3 rounded-xl transition-colors shadow-md"
           >
             <Plus className="w-5 h-5" />
@@ -183,6 +193,11 @@ export const Schedule = () => {
             className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
           >
             <h2 className="text-2xl font-bold text-paypal-dark mb-6">Add Schedule</h2>
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
+                {error}
+              </div>
+            )}
             <form onSubmit={handleCreateSchedule} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Course</label>
@@ -255,7 +270,10 @@ export const Schedule = () => {
               <div className="flex space-x-4 mt-8">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    setError('');
+                  }}
                   className="flex-1 px-4 py-3 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 font-semibold transition-colors"
                 >
                   Cancel

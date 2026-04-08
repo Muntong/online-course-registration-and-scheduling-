@@ -21,6 +21,28 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
 router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, res) => {
   try {
     const { course, lecturer, dayOfWeek, startTime, endTime, room } = req.body;
+
+    // Check for schedule conflicts (same room or same lecturer at the same time)
+    const conflictingSchedule = await Schedule.findOne({
+      dayOfWeek,
+      $or: [
+        { room },
+        { lecturer }
+      ],
+      $and: [
+        { startTime: { $lt: endTime } },
+        { endTime: { $gt: startTime } }
+      ]
+    }).populate('course', 'title');
+
+    if (conflictingSchedule) {
+      const conflictType = conflictingSchedule.room === room ? 'Room' : 'Lecturer';
+      const courseTitle = (conflictingSchedule.course as any)?.title || 'another course';
+      return res.status(400).json({ 
+        message: `Schedule conflict: ${conflictType} is already booked for ${courseTitle} during this time.` 
+      });
+    }
+
     const schedule = new Schedule({ course, lecturer, dayOfWeek, startTime, endTime, room });
     await schedule.save();
 
