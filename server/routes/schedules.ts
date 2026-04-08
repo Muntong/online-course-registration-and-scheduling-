@@ -95,6 +95,62 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
   }
 });
 
+// Update a schedule (Admin only)
+router.put('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequest, res) => {
+  try {
+    const { course, lecturer, date, dayOfWeek, startTime, endTime, room } = req.body;
+
+    // Check for schedule conflicts (same room or same lecturer at the same time)
+    const conflictQuery: any = {
+      _id: { $ne: req.params.id },
+      $or: [
+        { room },
+        { lecturer }
+      ],
+      $and: [
+        { startTime: { $lt: endTime } },
+        { endTime: { $gt: startTime } }
+      ]
+    };
+
+    if (date) {
+      conflictQuery.date = date;
+    } else {
+      conflictQuery.dayOfWeek = dayOfWeek;
+    }
+
+    const conflictingSchedule = await Schedule.findOne(conflictQuery).populate('course', 'title');
+
+    if (conflictingSchedule) {
+      const conflictType = conflictingSchedule.room === room ? 'Room' : 'Lecturer';
+      const courseTitle = (conflictingSchedule.course as any)?.title || 'another course';
+      return res.status(400).json({ 
+        message: `Schedule conflict: ${conflictType} is already booked for ${courseTitle} during this time.` 
+      });
+    }
+
+    const schedule = await Schedule.findByIdAndUpdate(
+      req.params.id,
+      { course, lecturer, date, dayOfWeek, startTime, endTime, room },
+      { new: true }
+    );
+
+    if (!schedule) return res.status(404).json({ message: 'Schedule not found' });
+
+    const courseData = await Course.findById(course);
+
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Updated a schedule',
+      details: `${courseData?.title || 'Course'} on ${date || dayOfWeek} at ${startTime}`
+    });
+
+    res.json(schedule);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Delete a schedule (Admin only)
 router.delete('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequest, res) => {
   try {

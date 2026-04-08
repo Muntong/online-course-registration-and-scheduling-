@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { motion } from 'motion/react';
-import { Calendar as CalendarIcon, Clock, MapPin, User as UserIcon, Plus, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, MapPin, User as UserIcon, Plus, Trash2, Edit2 } from 'lucide-react';
 
 export const Schedule = () => {
   const { user, token } = useAuthStore();
@@ -10,6 +10,8 @@ export const Schedule = () => {
   const [lecturers, setLecturers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [realTimeWarning, setRealTimeWarning] = useState('');
   const [newSchedule, setNewSchedule] = useState({
     course: '',
     lecturer: '',
@@ -28,6 +30,39 @@ export const Schedule = () => {
       fetchCoursesAndLecturers();
     }
   }, [user]);
+
+  // Real-time conflict checking
+  useEffect(() => {
+    if (!showModal) {
+      setRealTimeWarning('');
+      return;
+    }
+
+    const hasConflict = schedules.find(s => {
+      if (editingId && s._id === editingId) return false; // Ignore self when editing
+
+      const sameDay = newSchedule.date ? s.date === newSchedule.date : s.dayOfWeek === newSchedule.dayOfWeek;
+      if (!sameDay) return false;
+
+      const start1 = newSchedule.startTime;
+      const end1 = newSchedule.endTime;
+      const start2 = s.startTime;
+      const end2 = s.endTime;
+
+      const overlaps = start1 < end2 && end1 > start2;
+      if (!overlaps) return false;
+
+      return s.room === newSchedule.room || (s.lecturer?._id === newSchedule.lecturer || s.lecturer === newSchedule.lecturer);
+    });
+
+    if (hasConflict) {
+      const conflictType = hasConflict.room === newSchedule.room ? 'Room' : 'Lecturer';
+      const courseTitle = hasConflict.course?.title || 'another course';
+      setRealTimeWarning(`Warning: ${conflictType} is already booked for ${courseTitle} during this time.`);
+    } else {
+      setRealTimeWarning('');
+    }
+  }, [newSchedule, schedules, showModal, editingId]);
 
   const fetchSchedules = async () => {
     try {
@@ -72,12 +107,16 @@ export const Schedule = () => {
     setNewSchedule({ ...newSchedule, date: selectedDate, dayOfWeek });
   };
 
-  const handleCreateSchedule = async (e: React.FormEvent) => {
+  const handleSubmitSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (realTimeWarning) return; // Prevent submission if there's a conflict
     setError('');
     try {
-      const res = await fetch('/api/schedules', {
-        method: 'POST',
+      const url = editingId ? `/api/schedules/${editingId}` : '/api/schedules';
+      const method = editingId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
@@ -86,15 +125,31 @@ export const Schedule = () => {
       });
       if (res.ok) {
         setShowModal(false);
+        setEditingId(null);
         fetchSchedules();
       } else {
         const data = await res.json();
-        setError(data.message || 'Failed to create schedule');
+        setError(data.message || 'Failed to save schedule');
       }
     } catch (error) {
-      console.error('Error creating schedule:', error);
+      console.error('Error saving schedule:', error);
       setError('An unexpected error occurred');
     }
+  };
+
+  const handleEditClick = (schedule: any) => {
+    setNewSchedule({
+      course: schedule.course?._id || schedule.course,
+      lecturer: schedule.lecturer?._id || schedule.lecturer,
+      date: schedule.date || '',
+      dayOfWeek: schedule.dayOfWeek,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      room: schedule.room
+    });
+    setEditingId(schedule._id);
+    setError('');
+    setShowModal(true);
   };
 
   const handleDeleteSchedule = async (id: string) => {
@@ -139,6 +194,16 @@ export const Schedule = () => {
         {user?.role === 'admin' && (
           <button
             onClick={() => {
+              setNewSchedule({
+                course: '',
+                lecturer: '',
+                date: '',
+                dayOfWeek: 'Monday',
+                startTime: '09:00',
+                endTime: '10:30',
+                room: ''
+              });
+              setEditingId(null);
               setError('');
               setShowModal(true);
             }}
@@ -181,12 +246,20 @@ export const Schedule = () => {
                           {schedule.course?.code}
                         </span>
                         {user?.role === 'admin' && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(schedule._id); }}
-                            className="ml-2 text-red-400 hover:text-red-600 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center ml-2 space-x-1">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleEditClick(schedule); }}
+                              className="text-gray-400 hover:text-paypal-light transition-colors p-1"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(schedule._id); }}
+                              className="text-red-400 hover:text-red-600 transition-colors p-1"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -223,13 +296,18 @@ export const Schedule = () => {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl"
           >
-            <h2 className="text-2xl font-bold text-paypal-dark mb-6">Add Schedule</h2>
+            <h2 className="text-2xl font-bold text-paypal-dark mb-6">{editingId ? 'Edit Schedule' : 'Add Schedule'}</h2>
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-sm">
                 {error}
               </div>
             )}
-            <form onSubmit={handleCreateSchedule} className="space-y-4">
+            {realTimeWarning && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-xl text-sm">
+                {realTimeWarning}
+              </div>
+            )}
+            <form onSubmit={handleSubmitSchedule} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Course</label>
                 <select
@@ -313,6 +391,7 @@ export const Schedule = () => {
                   onClick={() => {
                     setShowModal(false);
                     setError('');
+                    setEditingId(null);
                   }}
                   className="flex-1 px-4 py-3 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 font-semibold transition-colors"
                 >
@@ -320,9 +399,14 @@ export const Schedule = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-3 bg-paypal-light hover:bg-paypal-dark text-white rounded-xl font-semibold transition-colors shadow-md"
+                  disabled={!!realTimeWarning}
+                  className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-colors shadow-md ${
+                    realTimeWarning 
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                      : 'bg-paypal-light hover:bg-paypal-dark text-white'
+                  }`}
                 >
-                  Create
+                  {editingId ? 'Save Changes' : 'Create'}
                 </button>
               </div>
             </form>
