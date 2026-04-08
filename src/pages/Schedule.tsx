@@ -13,6 +13,7 @@ export const Schedule = () => {
   const [newSchedule, setNewSchedule] = useState({
     course: '',
     lecturer: '',
+    date: '',
     dayOfWeek: 'Monday',
     startTime: '09:00',
     endTime: '10:30',
@@ -59,6 +60,18 @@ export const Schedule = () => {
     }
   };
 
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedDate = e.target.value;
+    if (!selectedDate) {
+      setNewSchedule({ ...newSchedule, date: '' });
+      return;
+    }
+    const dateObj = new Date(selectedDate);
+    const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayOfWeek = daysOfWeek[dateObj.getDay()];
+    setNewSchedule({ ...newSchedule, date: selectedDate, dayOfWeek });
+  };
+
   const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -99,6 +112,20 @@ export const Schedule = () => {
   };
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+  const getNextDateForDay = (dayOfWeek: string) => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const targetDay = days.indexOf(dayOfWeek);
+    const today = new Date();
+    const currentDay = today.getDay();
+    let distance = targetDay - currentDay;
+    if (distance < 0) {
+      distance += 7; // Get next occurrence if the day has passed this week
+    }
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() + distance);
+    return targetDate.toISOString().split('T')[0];
+  };
 
   if (loading) return <div className="p-8 text-center text-gray-500">Loading schedule...</div>;
 
@@ -166,6 +193,10 @@ export const Schedule = () => {
                     
                     <div className="space-y-2 mt-3">
                       <div className="flex items-center text-xs text-gray-600">
+                        <CalendarIcon className="w-3.5 h-3.5 mr-1.5 text-paypal-light" />
+                        {schedule.date || getNextDateForDay(schedule.dayOfWeek)}
+                      </div>
+                      <div className="flex items-center text-xs text-gray-600">
                         <Clock className="w-3.5 h-3.5 mr-1.5 text-paypal-light" />
                         {schedule.startTime} - {schedule.endTime}
                       </div>
@@ -222,6 +253,15 @@ export const Schedule = () => {
                   <option value="">Select Lecturer</option>
                   {lecturers.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date (Optional)</label>
+                <input
+                  type="date"
+                  value={newSchedule.date}
+                  onChange={handleDateChange}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-paypal-light outline-none"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Day of Week</label>

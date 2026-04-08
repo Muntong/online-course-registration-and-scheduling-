@@ -3,6 +3,7 @@ import { Schedule } from '../models/Schedule.js';
 import { Course } from '../models/Course.js';
 import { User } from '../models/User.js';
 import { Notification } from '../models/Notification.js';
+import { Activity } from '../models/Activity.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -20,11 +21,10 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
 // Create a schedule (Admin only)
 router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, res) => {
   try {
-    const { course, lecturer, dayOfWeek, startTime, endTime, room } = req.body;
+    const { course, lecturer, date, dayOfWeek, startTime, endTime, room } = req.body;
 
     // Check for schedule conflicts (same room or same lecturer at the same time)
-    const conflictingSchedule = await Schedule.findOne({
-      dayOfWeek,
+    const conflictQuery: any = {
       $or: [
         { room },
         { lecturer }
@@ -33,7 +33,15 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
         { startTime: { $lt: endTime } },
         { endTime: { $gt: startTime } }
       ]
-    }).populate('course', 'title');
+    };
+
+    if (date) {
+      conflictQuery.date = date;
+    } else {
+      conflictQuery.dayOfWeek = dayOfWeek;
+    }
+
+    const conflictingSchedule = await Schedule.findOne(conflictQuery).populate('course', 'title');
 
     if (conflictingSchedule) {
       const conflictType = conflictingSchedule.room === room ? 'Room' : 'Lecturer';
@@ -43,19 +51,20 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
       });
     }
 
-    const schedule = new Schedule({ course, lecturer, dayOfWeek, startTime, endTime, room });
+    const schedule = new Schedule({ course, lecturer, date, dayOfWeek, startTime, endTime, room });
     await schedule.save();
 
     // Notify students and lecturer
     const courseData = await Course.findById(course);
     if (courseData) {
       const notifications = [];
+      const dateString = date ? `${date} (${dayOfWeek})` : dayOfWeek;
       
       // Notify enrolled students
       for (const studentId of courseData.studentsEnrolled) {
         notifications.push({
           recipient: studentId,
-          message: `A new schedule has been added for ${courseData.title}: ${dayOfWeek} ${startTime}-${endTime} in ${room}`,
+          message: `A new schedule has been added for ${courseData.title}: ${dateString} ${startTime}-${endTime} in ${room}`,
           type: 'schedule'
         });
       }
@@ -64,7 +73,7 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
       if (lecturer) {
         notifications.push({
           recipient: lecturer,
-          message: `You have been assigned a new schedule for ${courseData.title}: ${dayOfWeek} ${startTime}-${endTime} in ${room}`,
+          message: `You have been assigned a new schedule for ${courseData.title}: ${dateString} ${startTime}-${endTime} in ${room}`,
           type: 'schedule'
         });
       }
@@ -73,6 +82,12 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
         await Notification.insertMany(notifications);
       }
     }
+
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Created a schedule',
+      details: `${courseData?.title || 'Course'} on ${date || dayOfWeek} at ${startTime}`
+    });
 
     res.status(201).json(schedule);
   } catch (error) {
@@ -85,6 +100,13 @@ router.delete('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequ
   try {
     const schedule = await Schedule.findByIdAndDelete(req.params.id);
     if (!schedule) return res.status(404).json({ message: 'Schedule not found' });
+
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Deleted a schedule',
+      details: `Schedule on ${schedule.date || schedule.dayOfWeek} at ${schedule.startTime}`
+    });
+
     res.json({ message: 'Schedule deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

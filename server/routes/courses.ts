@@ -2,6 +2,7 @@ import express from 'express';
 import { Course } from '../models/Course.js';
 import { User } from '../models/User.js';
 import { Notification } from '../models/Notification.js';
+import { Activity } from '../models/Activity.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -33,6 +34,12 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
     if (notifications.length > 0) {
       await Notification.insertMany(notifications);
     }
+
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Created a course',
+      details: `${title} (${code})`
+    });
 
     res.status(201).json(course);
   } catch (error) {
@@ -83,6 +90,12 @@ router.post('/:id/enroll', [authenticate, authorize(['student'])], async (req: A
       await Notification.insertMany(notifications);
     }
 
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Enrolled in a course',
+      details: `${course.title} (${course.code})`
+    });
+
     res.json({ message: 'Enrolled successfully', course });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -124,6 +137,12 @@ router.post('/:id/drop', [authenticate, authorize(['student'])], async (req: Aut
       await Notification.insertMany(notifications);
     }
 
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Dropped a course',
+      details: `${course.title} (${course.code})`
+    });
+
     res.json({ message: 'Dropped successfully', course });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -150,6 +169,12 @@ router.post('/:id/admin-enroll', [authenticate, authorize(['admin'])], async (re
       await user.save();
     }
 
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Admin enrolled a student',
+      details: `Enrolled ${user?.name} in ${course.title}`
+    });
+
     res.json({ message: 'Enrolled successfully', course });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -172,6 +197,12 @@ router.post('/:id/admin-drop', [authenticate, authorize(['admin'])], async (req:
       await user.save();
     }
 
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Admin dropped a student',
+      details: `Dropped ${user?.name} from ${course.title}`
+    });
+
     res.json({ message: 'Dropped successfully', course });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -188,6 +219,13 @@ router.put('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequest
       { new: true }
     );
     if (!course) return res.status(404).json({ message: 'Course not found' });
+
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Updated a course',
+      details: `${title} (${code})`
+    });
+
     res.json(course);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -199,6 +237,13 @@ router.delete('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequ
   try {
     const course = await Course.findByIdAndDelete(req.params.id);
     if (!course) return res.status(404).json({ message: 'Course not found' });
+
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Deleted a course',
+      details: `${course.title} (${course.code})`
+    });
+
     res.json({ message: 'Course deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

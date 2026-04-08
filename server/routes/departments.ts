@@ -1,5 +1,6 @@
 import express from 'express';
 import { Department } from '../models/Department.js';
+import { Activity } from '../models/Activity.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -24,6 +25,12 @@ router.post('/', [authenticate, authorize(['admin'])], async (req: AuthRequest, 
     const newDepartment = new Department({ name, code, faculty, headOfDepartment });
     await newDepartment.save();
     
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Created a department',
+      details: `${name} (${code})`
+    });
+
     const populated = await newDepartment.populate('headOfDepartment', 'name email');
     res.status(201).json(populated);
   } catch (error) {
@@ -46,6 +53,13 @@ router.put('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequest
     ).populate('headOfDepartment', 'name email');
     
     if (!department) return res.status(404).json({ message: 'Department not found' });
+
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Updated a department',
+      details: `${name} (${code})`
+    });
+
     res.json(department);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -57,6 +71,13 @@ router.delete('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequ
   try {
     const department = await Department.findByIdAndDelete(req.params.id);
     if (!department) return res.status(404).json({ message: 'Department not found' });
+
+    await Activity.create({
+      user: req.user?.id,
+      action: 'Deleted a department',
+      details: `${department.name} (${department.code})`
+    });
+
     res.json({ message: 'Department deleted' });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });

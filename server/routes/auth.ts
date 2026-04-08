@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User.js';
 import { Notification } from '../models/Notification.js';
+import { Activity } from '../models/Activity.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -42,6 +43,12 @@ router.post('/register', async (req, res) => {
       }
     }
 
+    await Activity.create({
+      user: user._id,
+      action: 'Registered an account',
+      details: `Role: ${assignedRole}`
+    });
+
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'supersecretjwtkey', { expiresIn: '1h' });
     res.header('Authorization', token).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (error) {
@@ -58,6 +65,12 @@ router.post('/login', async (req, res) => {
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) return res.status(400).json({ message: 'Invalid email or password.' });
+
+    await Activity.create({
+      user: user._id,
+      action: 'Logged in',
+      details: 'User logged into the system'
+    });
 
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET || 'supersecretjwtkey', { expiresIn: '1h' });
     res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
