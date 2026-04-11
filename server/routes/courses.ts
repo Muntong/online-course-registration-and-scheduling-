@@ -5,6 +5,8 @@ import { Notification } from '../models/Notification.js';
 import { Activity } from '../models/Activity.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 
+import { Schedule } from '../models/Schedule.js';
+
 const router = express.Router();
 
 // Get all courses
@@ -237,6 +239,9 @@ router.delete('/:id', [authenticate, authorize(['admin'])], async (req: AuthRequ
   try {
     const course = await Course.findByIdAndDelete(req.params.id);
     if (!course) return res.status(404).json({ message: 'Course not found' });
+
+    // Delete all schedules associated with this course
+    await Schedule.deleteMany({ course: req.params.id });
 
     await Activity.create({
       user: req.user?.id,

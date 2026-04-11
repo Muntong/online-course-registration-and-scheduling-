@@ -166,7 +166,7 @@ export const Schedule = () => {
     }
   };
 
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   const getNextDateForDay = (dayOfWeek: string) => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -216,7 +216,7 @@ export const Schedule = () => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="grid grid-cols-5 border-b border-gray-100 bg-paypal-bg">
+        <div className="grid grid-cols-7 border-b border-gray-100 bg-paypal-bg">
           {days.map((day) => (
             <div key={day} className="p-4 text-center font-semibold text-paypal-dark border-r border-gray-100 last:border-0">
               {day}
@@ -224,7 +224,7 @@ export const Schedule = () => {
           ))}
         </div>
         
-        <div className="grid grid-cols-5 min-h-[600px] bg-white">
+        <div className="grid grid-cols-7 min-h-[600px] bg-white">
           {days.map((day) => (
             <div key={day} className="border-r border-gray-100 last:border-0 p-4 space-y-4">
               {schedules

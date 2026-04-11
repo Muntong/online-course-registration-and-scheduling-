@@ -12,7 +12,9 @@ const router = express.Router();
 router.get('/', authenticate, async (req: AuthRequest, res) => {
   try {
     const schedules = await Schedule.find().populate('course', 'title code').populate('lecturer', 'name email');
-    res.json(schedules);
+    // Filter out schedules where the referenced course or lecturer has been deleted
+    const validSchedules = schedules.filter(s => s.course != null && s.lecturer != null);
+    res.json(validSchedules);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
