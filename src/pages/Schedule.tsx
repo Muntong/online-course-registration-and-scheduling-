@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { motion } from 'motion/react';
-import { Calendar as CalendarIcon, Clock, MapPin, User as UserIcon, Plus, Trash2, Edit2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, MapPin, User as UserIcon, Plus, Trash2, Edit2, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export const Schedule = () => {
   const { user, token } = useAuthStore();
@@ -182,6 +184,26 @@ export const Schedule = () => {
     return targetDate.toISOString().split('T')[0];
   };
 
+  const handleDownloadPDF = async () => {
+    const element = document.getElementById('schedule-grid');
+    if (!element) return;
+
+    try {
+      const canvas = await html2canvas(element, { scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' for landscape mode fits 7 columns better
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.text("Weekly Class Schedule", 14, 15);
+      pdf.addImage(imgData, 'PNG', 0, 25, pdfWidth, pdfHeight);
+      pdf.save('weekly-schedule.pdf');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-gray-500">Loading schedule...</div>;
 
   return (
@@ -191,31 +213,40 @@ export const Schedule = () => {
           <h1 className="text-3xl font-bold text-paypal-dark">Class Schedule</h1>
           <p className="text-gray-500 mt-2">View your weekly timetable.</p>
         </div>
-        {user?.role === 'admin' && (
+        <div className="flex space-x-3">
           <button
-            onClick={() => {
-              setNewSchedule({
-                course: '',
-                lecturer: '',
-                date: '',
-                dayOfWeek: 'Monday',
-                startTime: '09:00',
-                endTime: '10:30',
-                room: ''
-              });
-              setEditingId(null);
-              setError('');
-              setShowModal(true);
-            }}
-            className="flex items-center space-x-2 bg-paypal-light hover:bg-paypal-dark text-white px-6 py-3 rounded-xl transition-colors shadow-md"
+            onClick={handleDownloadPDF}
+            className="flex items-center space-x-2 bg-white border border-gray-200 hover:bg-gray-50 text-paypal-dark px-4 py-3 rounded-xl transition-colors shadow-sm"
           >
-            <Plus className="w-5 h-5" />
-            <span className="font-semibold">Add Schedule</span>
+            <Download className="w-5 h-5" />
+            <span className="font-semibold">Download PDF</span>
           </button>
-        )}
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => {
+                setNewSchedule({
+                  course: '',
+                  lecturer: '',
+                  date: '',
+                  dayOfWeek: 'Monday',
+                  startTime: '09:00',
+                  endTime: '10:30',
+                  room: ''
+                });
+                setEditingId(null);
+                setError('');
+                setShowModal(true);
+              }}
+              className="flex items-center space-x-2 bg-paypal-light hover:bg-paypal-dark text-white px-6 py-3 rounded-xl transition-colors shadow-md"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="font-semibold">Add Schedule</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div id="schedule-grid" className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="grid grid-cols-7 border-b border-gray-100 bg-paypal-bg">
           {days.map((day) => (
             <div key={day} className="p-4 text-center font-semibold text-paypal-dark border-r border-gray-100 last:border-0">

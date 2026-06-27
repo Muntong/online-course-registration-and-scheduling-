@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { BookOpen, Calendar, Users, LogOut, LayoutDashboard, FileEdit, School, Clock, BarChart3, Key, BarChart2 } from 'lucide-react';
 import { Notifications } from './Notifications';
+import { Chatbot } from './Chatbot';
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, logout } = useAuthStore();
@@ -92,6 +93,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         <div className="p-8 max-w-7xl mx-auto w-full">
           {children}
         </div>
+        <Chatbot />
       </main>
     </div>
   );

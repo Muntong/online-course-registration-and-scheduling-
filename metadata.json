@@ -1,5 +1,6 @@
 {
   "name": "EduSync Course System",
   "description": "A fully functional online course registration and scheduling system with Admin, Student, and Lecturer roles, featuring a PayPal-inspired UI.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
