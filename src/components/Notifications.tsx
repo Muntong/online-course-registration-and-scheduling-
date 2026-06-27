@@ -28,8 +28,10 @@ export const Notifications = () => {
         setNotifications(data);
         setUnreadCount(data.filter((n: any) => !n.read).length);
       }
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+    } catch (error: any) {
+      if (error?.message !== 'Failed to fetch') {
+        console.error('Error fetching notifications:', error);
+      }
     }
   };
 

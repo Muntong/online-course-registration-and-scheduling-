@@ -7,25 +7,32 @@ import { User } from '../models/User.js';
 
 const router = express.Router();
 
-let ai: GoogleGenAI | null = null;
-try {
-  if (process.env.GEMINI_API_KEY) {
-    ai = new GoogleGenAI({ 
-      apiKey: process.env.GEMINI_API_KEY,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
+let aiClient: GoogleGenAI | null = null;
+const getAiClient = () => {
+  if (!aiClient) {
+    const apiKey = process.env.GEMINI_API_KEY || ''; // Replace '' with your actual key if not using env variables
+    if (apiKey) {
+      try {
+        aiClient = new GoogleGenAI({ 
+          apiKey: apiKey,
+          httpOptions: {
+            headers: {
+              'User-Agent': 'aistudio-build',
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Failed to initialize GoogleGenAI:", e);
       }
-    });
+    }
   }
-} catch (e) {
-  console.error("Failed to initialize GoogleGenAI:", e);
-}
+  return aiClient;
+};
 
 // Chat API for EduSync AI Assistant
 router.post('/chat', authenticate, async (req: AuthRequest, res) => {
   try {
+    const ai = getAiClient();
     if (!ai) {
       return res.status(503).json({ message: 'AI service is currently unavailable (Missing API Key)' });
     }

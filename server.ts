@@ -5,6 +5,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 
+dotenv.config();
+
 // Import routes
 import authRoutes from './server/routes/auth.js';
 import courseRoutes from './server/routes/courses.js';
@@ -14,8 +16,6 @@ import departmentRoutes from './server/routes/departments.js';
 import notificationRoutes from './server/routes/notifications.js';
 import activityRoutes from './server/routes/activities.js';
 import aiRoutes from './server/routes/ai.js';
-
-dotenv.config();
 
 async function startServer() {
   const app = express();
