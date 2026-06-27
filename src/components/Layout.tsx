@@ -90,7 +90,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
           </div>
         </header>
 
-        <div className="p-8 max-w-7xl mx-auto w-full">
+        <div className="p-8 max-w-[1600px] mx-auto w-full">
           {children}
         </div>
         <Chatbot />

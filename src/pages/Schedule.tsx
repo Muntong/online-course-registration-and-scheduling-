@@ -3,7 +3,8 @@ import { useAuthStore } from '../store/useAuthStore';
 import { motion } from 'motion/react';
 import { Calendar as CalendarIcon, Clock, MapPin, User as UserIcon, Plus, Trash2, Edit2, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+// @ts-ignore
+import domtoimage from 'dom-to-image-more';
 
 export const Schedule = () => {
   const { user, token } = useAuthStore();
@@ -185,18 +186,69 @@ export const Schedule = () => {
   };
 
   const handleDownloadPDF = async () => {
-    const element = document.getElementById('schedule-grid');
-    if (!element) return;
+    const container = document.getElementById('schedule-grid-container');
+    const innerGrid = document.getElementById('schedule-inner-grid');
+    if (!container || !innerGrid) return;
 
     try {
-      const canvas = await html2canvas(element, { scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('l', 'mm', 'a4'); // 'l' for landscape mode fits 7 columns better
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const printContainer = document.createElement('div');
+      printContainer.style.position = 'absolute';
+      printContainer.style.left = '-9999px';
+      printContainer.style.top = '0';
+      printContainer.style.backgroundColor = '#ffffff';
+      printContainer.style.padding = '24px';
+      printContainer.style.width = '1440px';
       
-      pdf.text("Weekly Class Schedule", 14, 15);
-      pdf.addImage(imgData, 'PNG', 0, 25, pdfWidth, pdfHeight);
+      const header = document.createElement('div');
+      header.style.display = 'flex';
+      header.style.alignItems = 'center';
+      header.style.marginBottom = '24px';
+      header.style.borderBottom = '2px solid #f3f4f6';
+      header.style.paddingBottom = '20px';
+
+      header.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#003087" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+          </svg>
+          <span style="font-size: 28px; font-weight: 800; color: #1e293b; letter-spacing: -0.02em;">EduSync</span>
+        </div>
+        <div style="margin-left: auto;">
+          <span style="font-size: 20px; font-weight: 600; color: #475569;">Weekly Class Schedule</span>
+        </div>
+      `;
+      
+      const gridClone = innerGrid.cloneNode(true) as HTMLElement;
+      gridClone.style.minWidth = '100%';
+
+      // Remove action buttons and icons from the grid clone
+      gridClone.querySelectorAll('button').forEach(btn => btn.remove());
+      gridClone.querySelectorAll('svg').forEach(svg => svg.remove());
+      
+      printContainer.appendChild(header);
+      printContainer.appendChild(gridClone);
+      document.body.appendChild(printContainer);
+
+      const dataUrl = await domtoimage.toPng(printContainer, {
+        bgcolor: '#ffffff',
+        style: {
+          transform: 'scale(1)',
+          transformOrigin: 'top left'
+        }
+      });
+      
+      document.body.removeChild(printContainer);
+
+      const img = new Image();
+      img.src = dataUrl;
+      await new Promise(resolve => img.onload = resolve);
+      
+      const pdf = new jsPDF('l', 'mm', 'a4'); 
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (img.height * pdfWidth) / img.width;
+      
+      pdf.addImage(dataUrl, 'PNG', 0, 5, pdfWidth, pdfHeight);
       pdf.save('weekly-schedule.pdf');
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -207,7 +259,7 @@ export const Schedule = () => {
   if (loading) return <div className="p-8 text-center text-gray-500">Loading schedule...</div>;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 w-full">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-paypal-dark">Class Schedule</h1>
@@ -246,8 +298,9 @@ export const Schedule = () => {
         </div>
       </div>
 
-      <div id="schedule-grid" className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-gray-100 bg-paypal-bg">
+      <div id="schedule-grid-container" className="overflow-x-auto pb-4 w-full bg-white rounded-2xl shadow-sm border border-gray-100">
+        <div id="schedule-inner-grid" className="min-w-[1400px] w-full bg-white">
+          <div className="grid grid-cols-7 border-b border-gray-100 bg-paypal-bg rounded-t-2xl">
           {days.map((day) => (
             <div key={day} className="p-4 text-center font-semibold text-paypal-dark border-r border-gray-100 last:border-0">
               {day}
@@ -266,27 +319,30 @@ export const Schedule = () => {
                     key={schedule._id}
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="bg-paypal-bg p-4 rounded-xl border border-paypal-light/20 shadow-sm hover:shadow-md transition-all cursor-pointer"
+                    onClick={() => user?.role === 'admin' && handleEditClick(schedule)}
+                    className={`bg-paypal-bg p-5 rounded-2xl border border-paypal-light/20 shadow-sm transition-all flex flex-col ${
+                      user?.role === 'admin' ? 'cursor-pointer hover:shadow-md hover:border-paypal-light/50' : ''
+                    }`}
                   >
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-bold text-paypal-dark text-sm leading-tight">
+                    <div className="flex justify-between items-start mb-3 gap-2">
+                      <h3 className="font-bold text-paypal-dark text-base leading-snug">
                         {schedule.course?.title || 'Unknown Course'}
                       </h3>
-                      <div className="flex items-center">
-                        <span className="text-[10px] font-bold px-2 py-1 bg-white text-paypal-light rounded-md shadow-sm whitespace-nowrap ml-2">
+                      <div className="flex items-center shrink-0">
+                        <span className="text-[11px] font-bold px-2.5 py-1 bg-white text-paypal-light rounded-md shadow-sm whitespace-nowrap">
                           {schedule.course?.code}
                         </span>
                         {user?.role === 'admin' && (
                           <div className="flex items-center ml-2 space-x-1">
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleEditClick(schedule); }}
-                              className="text-gray-400 hover:text-paypal-light transition-colors p-1"
+                              className="text-gray-400 hover:text-paypal-light transition-colors p-1.5 hover:bg-white rounded-lg"
                             >
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(schedule._id); }}
-                              className="text-red-400 hover:text-red-600 transition-colors p-1"
+                              className="text-red-400 hover:text-red-600 transition-colors p-1.5 hover:bg-red-50 rounded-lg"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -295,22 +351,22 @@ export const Schedule = () => {
                       </div>
                     </div>
                     
-                    <div className="space-y-2 mt-3">
-                      <div className="flex items-center text-xs text-gray-600">
-                        <CalendarIcon className="w-3.5 h-3.5 mr-1.5 text-paypal-light" />
-                        {schedule.date || getNextDateForDay(schedule.dayOfWeek)}
+                    <div className="space-y-2.5 mt-auto pt-2">
+                      <div className="flex items-center text-sm text-gray-700">
+                        <CalendarIcon className="w-4 h-4 mr-2 text-paypal-light shrink-0" />
+                        <span className="truncate">{schedule.date || getNextDateForDay(schedule.dayOfWeek)}</span>
                       </div>
-                      <div className="flex items-center text-xs text-gray-600">
-                        <Clock className="w-3.5 h-3.5 mr-1.5 text-paypal-light" />
-                        {schedule.startTime} - {schedule.endTime}
+                      <div className="flex items-center text-sm text-gray-700">
+                        <Clock className="w-4 h-4 mr-2 text-paypal-light shrink-0" />
+                        <span className="truncate">{schedule.startTime} - {schedule.endTime}</span>
                       </div>
-                      <div className="flex items-center text-xs text-gray-600">
-                        <MapPin className="w-3.5 h-3.5 mr-1.5 text-paypal-light" />
-                        {schedule.room}
+                      <div className="flex items-center text-sm text-gray-700">
+                        <MapPin className="w-4 h-4 mr-2 text-paypal-light shrink-0" />
+                        <span className="truncate">{schedule.room}</span>
                       </div>
-                      <div className="flex items-center text-xs text-gray-600">
-                        <UserIcon className="w-3.5 h-3.5 mr-1.5 text-paypal-light" />
-                        {schedule.lecturer?.name || 'TBA'}
+                      <div className="flex items-center text-sm text-gray-700">
+                        <UserIcon className="w-4 h-4 mr-2 text-paypal-light shrink-0" />
+                        <span className="truncate">{schedule.lecturer?.name || 'TBA'}</span>
                       </div>
                     </div>
                   </motion.div>
@@ -318,6 +374,7 @@ export const Schedule = () => {
             </div>
           ))}
         </div>
+      </div>
       </div>
 
       {showModal && (
